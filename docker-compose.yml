@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./db:/app/db
+      - ./logs:/app/logs
+      - ./static/img:/app/static/img
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:////app/db/GreenAtom.db
+    depends_on:
+      - scheduler
+
+  scheduler:
+    build: .
+    command: python metrics/scheduler.py
+    volumes:
+      - ./logs:/app/logs
+      - ./metrics:/app/metrics
+    restart: unless-stopped
+
+  bot:
+    build: .
+    command: python trip_bot/bot.py
+    volumes:
+      - ./trip_bot/data:/app/trip_bot/data
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  log_data:
+  static_data:

@@ -101,7 +101,6 @@ class AdminCommands(StatesGroup):
 def load_documents():
     pdf_paths = [
         "data/registration_guide.pdf",
-        "data/tariffs.pdf",
         "data/digital_signature_manual.pdf"
     ]
 
