@@ -1,6 +1,9 @@
 import os
 import logging
-from typing import Optional
+import json
+from typing import Optional, Dict
+from collections import defaultdict
+from datetime import datetime
 from gigachat import GigaChat
 from gigachat.models import Chat, Messages, MessagesRole
 
@@ -24,7 +27,8 @@ logger = logging.getLogger(__name__)
 
 # Конфигурация
 API_TOKEN = "7810891694:AAFQWbhhUd28qQa7Iutt5-k5oOewOnzUz88"
-GIGACHAT_CREDENTIALS = "MTlmNjg5ZTYtNzRhNS00NzFjLTg4NzEtM2I2OThmNDdkNTk4OmY3OWJkODU0LTRiMGUtNDg3ZC1iMzEzLTNlODc4ZjYxNGRmZQ=="  # Авторизационные данные (логин/пароль или токен)
+GIGACHAT_CREDENTIALS = "MTlmNjg5ZTYtNzRhNS00NzFjLTg4NzEtM2I2OThmNDdkNTk4OmY3OWJkODU0LTRiMGUtNDg3ZC1iMzEzLTNlODc4ZjYxNGRmZQ=="
+METRICS_FILE = "metrics.json"  # Файл для хранения метрик
 
 # Инициализация бота
 bot = Bot(token=API_TOKEN)
@@ -35,10 +39,62 @@ dp = Dispatcher(storage=storage)
 gigachat = GigaChat(credentials=GIGACHAT_CREDENTIALS, verify_ssl_certs=False)
 
 
+# МЕТРИКИ: Хранение популярных вопросов
+class QuestionMetrics:
+    def __init__(self, filename: str = METRICS_FILE):
+        self.filename = filename
+        self.question_counts = defaultdict(int)
+        self.last_updated = None
+        self.load_metrics()
+
+    def add_question(self, question: str):
+        normalized_question = question.lower().strip()
+        self.question_counts[normalized_question] += 1
+        self.last_updated = datetime.now()
+        self.save_metrics()
+
+    def get_top_questions(self, n: int = 5) -> Dict[str, int]:
+        sorted_questions = sorted(
+            self.question_counts.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+        return dict(sorted_questions[:n])
+
+    def save_metrics(self):
+        try:
+            data = {
+                "question_counts": dict(self.question_counts),
+                "last_updated": self.last_updated.isoformat() if self.last_updated else None
+            }
+            with open(self.filename, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving metrics: {e}")
+
+    def load_metrics(self):
+        try:
+            if os.path.exists(self.filename):
+                with open(self.filename, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.question_counts = defaultdict(int, data.get("question_counts", {}))
+                    last_updated = data.get("last_updated")
+                    self.last_updated = datetime.fromisoformat(last_updated) if last_updated else None
+        except Exception as e:
+            logger.error(f"Error loading metrics: {e}")
+
+
+metrics = QuestionMetrics()
+
+
 # Состояния для FSM
 class WasteCalculation(StatesGroup):
     waiting_for_waste_class = State()
     waiting_for_waste_amount = State()
+
+
+class AdminCommands(StatesGroup):
+    waiting_for_admin_password = State()
 
 
 # Загрузка и обработка PDF документов
@@ -136,6 +192,34 @@ async def cmd_help(message: types.Message):
     )
 
 
+@dp.message(Command("metrics"))
+async def cmd_metrics(message: types.Message, state: FSMContext):
+    await message.answer("Введите пароль администратора:")
+    await state.set_state(AdminCommands.waiting_for_admin_password)
+
+
+@dp.message(AdminCommands.waiting_for_admin_password)
+async def process_admin_password(message: types.Message, state: FSMContext):
+    if message.text.strip() == "admin123":  # Пример пароля
+        top_questions = metrics.get_top_questions(10)
+
+        if not top_questions:
+            response = "Пока нет данных о популярных вопросах."
+        else:
+            response = "📊 <b>Топ-10 популярных вопросов:</b>\n\n"
+            for i, (question, count) in enumerate(top_questions.items(), 1):
+                response += f"{i}. {question} (задано {count} раз)\n"
+
+            response += f"\nПоследнее обновление: {metrics.last_updated}"
+
+        await message.answer(response, parse_mode=ParseMode.HTML)
+    else:
+        await message.answer("Неверный пароль администратора.")
+
+    await state.clear()
+    await message.answer("Главное меню:", reply_markup=main_menu_keyboard())
+
+
 # Обработчики кнопок меню
 @dp.message(F.text == "📝 Регистрация в ФГИС ОПВК")
 async def registration_guide(message: types.Message):
@@ -231,7 +315,6 @@ async def calculate_cost(message: types.Message, state: FSMContext):
 # Обработка произвольных текстовых запросов с GigaChat
 @dp.message(F.text)
 async def handle_text_query(message: types.Message, state: FSMContext):
-    # Пропускаем если пользователь в состоянии FSM
     current_state = await state.get_state()
     if current_state:
         return
@@ -241,15 +324,12 @@ async def handle_text_query(message: types.Message, state: FSMContext):
         await message.answer("Пожалуйста, введите вопрос (максимум 500 символов).")
         return
 
-    try:
-        # Индикатор "бот печатает"
-        await bot.send_chat_action(message.chat.id, "typing")
+    metrics.add_question(query)
 
-        # Поиск релевантных фрагментов в PDF
+    try:
+        await bot.send_chat_action(message.chat.id, "typing")
         docs = vector_db.similarity_search(query, k=3)
         context = "\n\n---\n\n".join([d.page_content for d in docs])
-
-        # Генерация ответа через GigaChat
         answer = await ask_gigachat(
             question=query,
             context=f"Документация ФГИС ОПВК:\n{context}"
@@ -258,7 +338,6 @@ async def handle_text_query(message: types.Message, state: FSMContext):
         if not answer:
             raise ValueError("Пустой ответ от GigaChat API")
 
-        # Форматирование ответа
         response = (
             f"📄 <b>Ответ по вашему запросу:</b>\n\n"
             f"{answer}\n\n"
