@@ -50,88 +50,100 @@
                         </h2>
                     </div>
                     <div class="card-body p-4 p-md-5">
-                        <form action="{{ url_for('register') }}" method="post" novalidate>
-                            {{ form.hidden_tag() }}
-
-                            <!-- Email -->
-                            <div class="mb-4">
-                                <label for="{{ form.email.id }}" class="form-label fw-semibold">
-                                    <i class="bi bi-envelope-fill me-2"></i>Email
-                                </label>
-                                {{ form.email(class="form-control form-control-lg", placeholder="example@mail.com") }}
-                                {% for error in form.email.errors %}
-                                    <div class="invalid-feedback text-danger">
-                                        <i class="bi bi-exclamation-circle-fill"></i>{{ error }}
-                                    </div>
-                                {% endfor %}
+                        {% if current_user.is_authenticated %}
+                            <div class="alert alert-info text-center">
+                                <i class="bi bi-info-circle-fill me-2"></i>
+                                Вы уже зарегистрированы и вошли в систему как {{ current_user.name }}.
                             </div>
-
-                            <!-- Имя -->
-                            <div class="mb-4">
-                                <label for="{{ form.name.id }}" class="form-label fw-semibold">
-                                    <i class="bi bi-person-fill me-2"></i>Имя пользователя
-                                </label>
-                                {{ form.name(class="form-control form-control-lg", placeholder="Иван Иванов") }}
-                                {% for error in form.name.errors %}
-                                    <div class="invalid-feedback text-danger">
-                                        <i class="bi bi-exclamation-circle-fill"></i>{{ error }}
-                                    </div>
-                                {% endfor %}
-                            </div>
-
-                            <!-- Пароль -->
-                            <div class="mb-4">
-                                <label for="{{ form.password.id }}" class="form-label fw-semibold">
-                                    <i class="bi bi-lock-fill me-2"></i>Пароль
-                                </label>
-                                {{ form.password(class="form-control form-control-lg", placeholder="Не менее 6 символов") }}
-                                <small class="form-text text-muted">
-                                    <i class="bi bi-info-circle"></i> Используйте буквы, цифры и спецсимволы
-                                </small>
-                                {% for error in form.password.errors %}
-                                    <div class="invalid-feedback text-danger">
-                                        <i class="bi bi-exclamation-circle-fill"></i>{{ error }}
-                                    </div>
-                                {% endfor %}
-                            </div>
-
-                            <!-- Подтверждение пароля -->
-                            <div class="mb-4">
-                                <label for="{{ form.password_again.id }}" class="form-label fw-semibold">
-                                    <i class="bi bi-lock-fill me-2"></i>Повторите пароль
-                                </label>
-                                {{ form.password_again(class="form-control form-control-lg", placeholder="Повторите пароль") }}
-                                {% for error in form.password_again.errors %}
-                                    <div class="invalid-feedback text-danger">
-                                        <i class="bi bi-exclamation-circle-fill"></i>{{ error }}
-                                    </div>
-                                {% endfor %}
-                            </div>
-
-                            <!-- Кнопки -->
-                            <div class="d-flex justify-content-between">
-                                {{ form.submit(class="btn btn-primary btn-lg flex-grow-1 me-2") }}
-                                {{ form.sumbitten(class="btn btn-outline-secondary btn-lg") }}
-                            </div>
-
-                            <!-- Ссылка на вход -->
                             <div class="text-center mt-4">
-                                <p class="mb-0">Уже есть аккаунт?
-                                    <a href="{{ url_for('login') }}" class="text-decoration-none fw-semibold">Войти</a>
-                                </p>
+                                <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+                                    <i class="bi bi-house-door-fill me-2"></i>На главную
+                                </a>
                             </div>
+                        {% else %}
+                            <form action="{{ url_for('register') }}" method="post" novalidate>
+                                {{ form.hidden_tag() }}
 
-                            <!-- Flash сообщения -->
-                            {% with messages = get_flashed_messages(with_categories=true) %}
-                                {% if messages %}
-                                    {% for category, message in messages %}
-                                        <div class="alert alert-{{ category }} mt-4">
-                                            <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ message }}
+                                <!-- Email -->
+                                <div class="mb-4">
+                                    <label for="{{ form.email.id }}" class="form-label fw-semibold">
+                                        <i class="bi bi-envelope-fill me-2"></i>Email
+                                    </label>
+                                    {{ form.email(class="form-control form-control-lg", placeholder="example@mail.com") }}
+                                    {% for error in form.email.errors %}
+                                        <div class="invalid-feedback text-danger">
+                                            <i class="bi bi-exclamation-circle-fill"></i>{{ error }}
                                         </div>
                                     {% endfor %}
-                                {% endif %}
-                            {% endwith %}
-                        </form>
+                                </div>
+
+                                <!-- Имя -->
+                                <div class="mb-4">
+                                    <label for="{{ form.name.id }}" class="form-label fw-semibold">
+                                        <i class="bi bi-person-fill me-2"></i>Имя пользователя
+                                    </label>
+                                    {{ form.name(class="form-control form-control-lg", placeholder="Иван Иванов") }}
+                                    {% for error in form.name.errors %}
+                                        <div class="invalid-feedback text-danger">
+                                            <i class="bi bi-exclamation-circle-fill"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+
+                                <!-- Пароль -->
+                                <div class="mb-4">
+                                    <label for="{{ form.password.id }}" class="form-label fw-semibold">
+                                        <i class="bi bi-lock-fill me-2"></i>Пароль
+                                    </label>
+                                    {{ form.password(class="form-control form-control-lg", placeholder="Не менее 6 символов") }}
+                                    <small class="form-text text-muted">
+                                        <i class="bi bi-info-circle"></i> Используйте буквы, цифры и спецсимволы
+                                    </small>
+                                    {% for error in form.password.errors %}
+                                        <div class="invalid-feedback text-danger">
+                                            <i class="bi bi-exclamation-circle-fill"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+
+                                <!-- Подтверждение пароля -->
+                                <div class="mb-4">
+                                    <label for="{{ form.password_again.id }}" class="form-label fw-semibold">
+                                        <i class="bi bi-lock-fill me-2"></i>Повторите пароль
+                                    </label>
+                                    {{ form.password_again(class="form-control form-control-lg", placeholder="Повторите пароль") }}
+                                    {% for error in form.password_again.errors %}
+                                        <div class="invalid-feedback text-danger">
+                                            <i class="bi bi-exclamation-circle-fill"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+
+                                <!-- Кнопки -->
+                                <div class="d-flex justify-content-between">
+                                    {{ form.submit(class="btn btn-primary btn-lg flex-grow-1 me-2") }}
+                                    {{ form.sumbitten(class="btn btn-outline-secondary btn-lg") }}
+                                </div>
+
+                                <!-- Ссылка на вход -->
+                                <div class="text-center mt-4">
+                                    <p class="mb-0">Уже есть аккаунт?
+                                        <a href="{{ url_for('login') }}" class="text-decoration-none fw-semibold">Войти</a>
+                                    </p>
+                                </div>
+
+                                <!-- Flash сообщения -->
+                                {% with messages = get_flashed_messages(with_categories=true) %}
+                                    {% if messages %}
+                                        {% for category, message in messages %}
+                                            <div class="alert alert-{{ category }} mt-4">
+                                                <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ message }}
+                                            </div>
+                                        {% endfor %}
+                                    {% endif %}
+                                {% endwith %}
+                            </form>
+                        {% endif %}
                     </div>
                 </div>
             </div>

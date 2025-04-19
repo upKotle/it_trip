@@ -1,97 +1,212 @@
-{% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-8 mx-auto">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h2 class="mb-0">Калькулятор утилизации отходов</h2>
-                </div>
-                <div class="card-body">
-                    <form method="POST" class="needs-validation" novalidate>
-                        <div class="mb-3">
-                            <label for="wasteClass" class="form-label">Класс отходов</label>
-                            <select class="form-select" id="wasteClass" name="waste_class" required>
-                                <option value="" selected disabled>Выберите класс отходов</option>
-                                <option value="I">I класс - {{ "{:,.2f}".format(waste_rates['I']) }} руб/т</option>
-                                <option value="II">II класс - {{ "{:,.2f}".format(waste_rates['II']) }} руб/т</option>
-                            </select>
-                            <div class="invalid-feedback">
-                                Пожалуйста, выберите класс отходов
-                            </div>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Калькулятор утилизации отходов</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .calc-card {
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border: none;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #1e88e5 0%, #0d47a1 100%);
+            color: white;
+            border-radius: 12px 12px 0 0 !important;
+        }
+
+        .form-control-lg {
+            padding: 12px 16px;
+            border-radius: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1e88e5 0%, #0d47a1 100%);
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .result-card {
+            background-color: #f0f8ff;
+            border-left: 4px solid #1e88e5;
+        }
+
+        .history-item {
+            border-left: 3px solid #0d47a1;
+            padding-left: 10px;
+            margin-bottom: 12px;
+            background-color: #ffffff;
+            border-radius: 4px;
+            padding: 10px;
+        }
+
+        .waste-class-badge {
+            font-size: 0.8rem;
+            padding: 0.35em 0.65em;
+            color: white;
+        }
+
+        .waste-class-1 {
+            background-color: #dc3545; /* красный */
+        }
+
+        .waste-class-2 {
+            background-color: #fd7e14; /* оранжевый */
+        }
+
+        /* Плавающая кнопка */
+        .btn-home-floating {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #1e88e5 0%, #0d47a1 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            z-index: 1050;
+            text-decoration: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            transition: background 0.3s ease;
+        }
+
+        .btn-home-floating:hover {
+            background: linear-gradient(135deg, #1565c0 0%, #0b3c91 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Плавающая кнопка на главную -->
+    <a href="{{ url_for('index') }}" class="btn-home-floating">
+        <i class="bi bi-house-door-fill me-1"></i>На главную
+    </a>
+
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="card calc-card">
+                    <div class="card-header text-center py-4">
+                        <h2 class="mb-0 fw-bold">
+                            <i class="bi bi-calculator me-2"></i>Калькулятор утилизации отходов
+                        </h2>
+                        {% if current_user.is_authenticated %}
+                        <div class="text-end mt-2">
+                            <small>Пользователь: {{ current_user.name }}</small>
                         </div>
-
-                        <div class="mb-3">
-                            <label for="volume" class="form-label">Объем отходов (тонны)</label>
-                            <input type="text" class="form-control" id="volume" name="volume"
-                                   pattern="^\d+([.,]\d{1,2})?$" required>
-                            <div class="invalid-feedback">
-                                Пожалуйста, введите корректное количество (например: 1.5 или 2,3)
+                        {% endif %}
+                    </div>
+                    <div class="card-body p-4 p-md-5">
+                        {% if not current_user.is_authenticated %}
+                            <div class="alert alert-warning text-center">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                Для доступа к калькулятору необходимо <a href="{{ url_for('login') }}" class="alert-link">войти</a> в систему.
                             </div>
-                        </div>
+                        {% else %}
+                            <form action="{{ url_for('waste_calculator') }}" method="post">
+                                {{ form.hidden_tag() }}
 
-                        <button type="submit" class="btn btn-primary btn-lg w-100">
-                            <i class="bi bi-calculator"></i> Рассчитать стоимость
-                        </button>
-                    </form>
-                </div>
-            </div>
+                                <!-- Класс отходов -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-semibold">
+                                        <i class="bi bi-trash-fill me-2"></i>Класс отходов
+                                    </label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="waste_class" id="class1" value="1" checked>
+                                        <label class="form-check-label" for="class1">
+                                            I класс (222 907,36 руб./тонна)
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="waste_class" id="class2" value="2">
+                                        <label class="form-check-label" for="class2">
+                                            II класс (62 468,26 руб./тонна)
+                                        </label>
+                                    </div>
+                                </div>
 
-            {% if last_price %}
-            <div class="alert alert-success mt-3">
-                <h4 class="alert-heading">Результат последнего расчета</h4>
-                <hr>
-                <p class="mb-0 fs-4">{{ "{:,.2f}".format(last_price) }} рублей</p>
-            </div>
-            {% endif %}
+                                <!-- Объем отходов -->
+                                <div class="mb-4">
+                                    <label for="waste_volume" class="form-label fw-semibold">
+                                        <i class="bi bi-speedometer2 me-2"></i>Объем отходов (тонн)
+                                    </label>
+                                    <input type="number" step="0.01" min="0" class="form-control form-control-lg"
+                                           id="waste_volume" name="waste_volume" required placeholder="Например: 1.5">
+                                </div>
 
-            {% if price_history %}
-            <div class="card mt-4">
-                <div class="card-header bg-secondary text-white">
-                    <h3 class="mb-0">История расчетов</h3>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Дата и время</th>
-                                    <th class="text-end">Стоимость</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in price_history %}
-                                <tr>
-                                    <td>{{ item.date }}</td>
-                                    <td class="text-end">{{ "{:,.2f}".format(item.price) }} руб.</td>
-                                </tr>
+                                <!-- Кнопка расчета -->
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="bi bi-calculator-fill me-2"></i>Рассчитать стоимость
+                                    </button>
+                                </div>
+
+                                <!-- Результат -->
+                                {% if result %}
+                                <div class="card result-card mt-4 p-3">
+                                    <div class="card-body">
+                                        <h5 class="card-title fw-bold">
+                                            <i class="bi bi-currency-dollar me-2"></i>Результат расчёта
+                                        </h5>
+                                        <p class="card-text fs-5">
+                                            Стоимость утилизации: <strong>{{ "%.2f"|format(result) }} руб.</strong>
+                                        </p>
+                                        <p class="card-text text-muted">
+                                            <span class="badge waste-class-{{ waste_class }} waste-class-badge">
+                                                {{ waste_class }} класс
+                                            </span>
+                                            Объём: {{ waste_volume }} т
+                                        </p>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </form>
+
+                            <!-- История расчётов -->
+                            {% if price_history %}
+                            <div class="mt-5">
+                                <h5 class="fw-bold mb-3">
+                                    <i class="bi bi-clock-history me-2"></i>Ваша история расчётов
+                                </h5>
+                                {% for entry in price_history %}
+                                <div class="history-item">
+                                    <div class="d-flex justify-content-between">
+                                        <div class="text-muted small">
+                                            {{ entry.date }}
+                                        </div>
+                                    </div>
+                                    <div class="mt-1 d-flex flex-wrap gap-2">
+                                        <span class="badge waste-class-{{ entry.waste_class }} waste-class-badge">
+                                            {{ entry.waste_class }} класс
+                                        </span>
+                                        <span class="text-muted">Стоимость: {{ entry.volume }} руб.</span>
+                                    </div>
+                                </div>
                                 {% endfor %}
-                            </tbody>
-                        </table>
+                            </div>
+                            {% endif %}
+                        {% endif %}
                     </div>
                 </div>
             </div>
-            {% endif %}
         </div>
     </div>
-</div>
 
-<script>
-// Валидация формы на клиенте
-(function() {
-    'use strict'
-
-    const forms = document.querySelectorAll('.needs-validation')
-
-    Array.from(forms).forEach(form => {
-        form.addEventListener('submit', event => {
-            if (!form.checkValidity()) {
-                event.preventDefault()
-                event.stopPropagation()
-            }
-
-            form.classList.add('was-validated')
-        }, false)
-    })
-})()
-</script>
-{% endblock %}
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

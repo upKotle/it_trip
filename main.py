@@ -5,6 +5,7 @@ from flask_login import LoginManager, logout_user, login_required, login_user, c
 from data.users import User, AuthToken, RememberToken
 from data import db_session
 from templates.forms.user import RegisterForm, LoginForm
+from templates.forms.calculator import WasteCalculatorForm
 from waitress import serve
 import os
 import datetime
@@ -192,6 +193,54 @@ def login():
     return render_template('login.html', form=form)
 
 
+RATES = {
+    '1': 222907.36,
+    '2': 62468.26
+}
+
+
+@app.route('/waste-calculator', methods=['GET', 'POST'])
+@login_required
+def waste_calculator():
+    form = WasteCalculatorForm()
+    result = None
+    waste_class = None
+    waste_volume = None
+
+    if request.method == 'POST' and form.validate_on_submit():
+        waste_class = request.form.get('waste_class')
+        waste_volume = float(request.form.get('waste_volume'))
+
+        # Расчет стоимости
+        rate = RATES.get(waste_class, 0)
+        result = rate * waste_volume
+
+        # Сохранение в историю пользователя
+        db_sess = db_session.create_session()
+        try:
+            user = db_sess.query(User).get(current_user.id)
+            user.add_price_to_history(result, waste_class, waste_volume, db_sess)
+            flash('Расчет выполнен успешно!', 'success')
+        except Exception as e:
+            db_sess.rollback()
+            flash('Ошибка при сохранении расчета', 'error')
+            app.logger.error(f"Error saving calculation: {str(e)}")
+        finally:
+            db_sess.close()
+
+    # Получение истории расчетов пользователя
+    price_history = []
+    if current_user.is_authenticated:
+        price_history = current_user.get_price_history()
+
+    return render_template('waste_calculator.html',
+                         form=form,
+                         result=result,
+                         waste_class=waste_class,
+                         waste_volume=waste_volume,
+                         price_history=price_history)
+
+
 @app.route('/logout')
 @login_required
 def logout():
@@ -238,59 +287,7 @@ def logout():
         db_sess.close()
 
 
-# Константы для тарифов
-WASTE_RATES = {
-    'I': 222907.36,
-    'II': 62468.26
-}
 
-
-@app.route('/waste-calculator', methods=['GET', 'POST'])
-@login_required
-def waste_calculator():
-    db_sess = db_session.create_session()
-    try:
-        if request.method == 'POST':
-            waste_class = request.form.get('waste_class')
-            volume_str = request.form.get('volume', '0').replace(',', '.')
-
-            try:
-                volume = float(volume_str)
-                if volume <= 0:
-                    raise ValueError
-            except ValueError:
-                flash('Пожалуйста, введите корректное положительное число для объема', 'error')
-                return redirect(url_for('waste_calculator'))
-
-            if waste_class not in WASTE_RATES:
-                flash('Пожалуйста, выберите корректный класс отходов', 'error')
-                return redirect(url_for('waste_calculator'))
-
-            price = round(WASTE_RATES[waste_class] * volume, 2)
-
-            # Добавляем цену в историю пользователя
-            current_user.add_price_to_history(price, db_sess)
-
-            flash(f'Стоимость утилизации: {price:,.2f} руб. (без НДС)', 'success')
-            return redirect(url_for('waste_calculator'))
-
-        # Получаем историю цен для отображения
-        price_history = current_user.get_price_history()
-
-        return render_template(
-            'waste_calculator.html',
-            user=current_user,
-            price_history=price_history,
-            last_price=price_history[0]['price'] if price_history else None,
-            waste_rates=WASTE_RATES
-        )
-    except Exception as e:
-        db_sess.rollback()
-        app.logger.error(f"Error in waste_calculator: {str(e)}")
-        flash('Произошла ошибка при расчете стоимости', 'error')
-        return redirect(url_for('index'))
-    finally:
-        db_sess.close()
 
 def run_server():
     port = int(os.getenv("PORT", 5000))

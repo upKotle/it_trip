@@ -28,24 +28,23 @@ class User(SqlAlchemyBase, UserMixin, SerializerMixin):
     def check_password(self, password):
         return check_password_hash(self.hashed_password, password)
 
-    def add_price_to_history(self, price, db_sess):
-        """Добавляет цену в историю и сохраняет в БД"""
+    def add_price_to_history(self, price, waste_class, waste_volume, db_sess):
+        """Добавляет цену в историю с классом отходов и объемом"""
         if self.price_history is None:
             self.price_history = ''
 
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.price_history = f"{timestamp}:{price:.2f}\n{self.price_history}"
+        self.price_history = f"{timestamp}:{price:.2f}:{waste_class}:{waste_volume}\n{self.price_history}"
 
         # Ограничиваем историю 100 последними записями
         prices = [p for p in self.price_history.split('\n') if p.strip()][:100]
         self.price_history = '\n'.join(prices)
 
-        # Явно добавляем пользователя в сессию для обновления
         db_sess.add(self)
         db_sess.commit()
 
     def get_price_history(self):
-        """Возвращает историю цен в виде списка словарей"""
+        """Возвращает историю цен с классом отходов и объемом"""
         if not self.price_history:
             return []
 
@@ -53,10 +52,17 @@ class User(SqlAlchemyBase, UserMixin, SerializerMixin):
         for entry in self.price_history.split('\n'):
             if entry.strip():
                 try:
-                    timestamp, price = entry.split(':', 1)
+                    parts = entry.split(':')
+                    timestamp = parts[0]
+                    price = float(parts[1])
+                    waste_class = parts[2] if len(parts) > 2 else None
+                    volume = parts[3] if len(parts) > 3 else None
+
                     history.append({
                         'date': timestamp,
-                        'price': float(price)
+                        'price': price,
+                        'waste_class': waste_class,
+                        'volume': volume
                     })
                 except (ValueError, IndexError):
                     continue
@@ -88,16 +94,3 @@ class RememberToken(SqlAlchemyBase):
 
     user = orm.relationship("User", back_populates="remember_tokens")
 
-
-# Добавим в models.py новый класс Calculation
-class Calculation(SqlAlchemyBase):
-    __tablename__ = 'calculations'
-
-    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
-    user_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey('users.id'))
-    waste_class = sqlalchemy.Column(sqlalchemy.String(10), nullable=False)
-    volume = sqlalchemy.Column(sqlalchemy.Float, nullable=False)
-    price = sqlalchemy.Column(sqlalchemy.Float, nullable=False)
-    calculation_date = sqlalchemy.Column(sqlalchemy.DateTime, default=datetime.datetime.now)
-
-    user = orm.relationship("User")
