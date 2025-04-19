@@ -94,3 +94,15 @@ class RememberToken(SqlAlchemyBase):
 
     user = orm.relationship("User", back_populates="remember_tokens")
 
+
+class ErrorLog(SqlAlchemyBase):
+    __tablename__ = 'error_logs'
+
+    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, autoincrement=True)
+    status_code = sqlalchemy.Column(sqlalchemy.Integer, nullable=False)
+    error_message = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
+    timestamp = sqlalchemy.Column(sqlalchemy.DateTime, default=datetime.datetime.now)
+    user_id = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey('users.id'), nullable=True)
+
+    user = orm.relationship("User")
+
